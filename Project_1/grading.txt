@@ -1,0 +1,7 @@
+Grading will primarily be based on performance on a set of benchmarks, both constructed by me and supplied by the class.  I'll aim to have at least 25 - 30 in the set, each worth the same number of points.  All the benchmarks will be publicly posted AFTER grades are released.
+
+In addition, 10 points will be given for submitting your 5 required benchmarks.
+
+For the final 10 points submit a README.  This should include instructions on how to build and run your project.  Try to minimize the number of steps required to build, for example, include a make script that does as much as possible automatically.
+
+Note that, when run, your project's output is supposed to contain only the strings "Verified" or "Not verified", and whitespace.  If your project outputs any other text, you will be asked to resubmit, and there will be an automatic 10% deduction.
