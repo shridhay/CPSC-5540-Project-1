@@ -43,7 +43,9 @@ import Parser.Lexer
     "end"       { TEnd }
     "while"     { TWhile }
     "do"        { TDo }
-    -- "inv"       { TInv }
+    "inv"       { TInv }
+    "pre"       { TPre }
+    "post"      { TPost }
     "program"   { TProgram }
     "is"        { TIs }
 
@@ -58,7 +60,7 @@ import Parser.Lexer
 %%
 
 prog :: { Program }
-     : "program" name "is" block "end" { ($2, $4) }
+     : "program" name assertion_block "is" block "end" { ($2, $3, $5) }
 
 arithExp :: { ArithExp }
          : int { Num $1 }
@@ -87,13 +89,26 @@ boolExp :: { BoolExp }
         | boolExp "&&" boolExp { BConj $1 $3 }
         | '(' boolExp ')' { BParens $2 }
 
+assertion :: { Assertion } 
+          : "pre" boolExp { Pre $2 }
+          | "post" boolExp { Post $2 }
+          | "inv" boolExp { Inv $2 }
+
+assertion_block :: { AssertionBlock }
+                : assertion_block_rev { reverse $1 }
+
+assertion_block_rev :: { AssertionBlock }
+                    : { [] }
+	               | assertion { [$1] }
+                    | assertion_block_rev assertion {$2:$1}
+
 stmt :: { Statement }
      : name ":=" arithExp ';' { Assign $1 $3 }
      | name ',' name ":=" arithExp ',' arithExp ';' { ParAssign $1 $3 $5 $7 }
      | name '[' arithExp ']' ":=" arithExp ';' { Write $1 $3 $6 }
      | "if" boolExp "then" block "else" block "end" { If $2 $4 $6 }
      | "if" boolExp "then" block "end" { If $2 $4 [] }
-     | "while" boolExp {- invs -} "do" block "end" { While $2 $4 }
+     | "while" boolExp assertion_block "do" block "end" { While $2 $3 $5 }
 
 block :: { Block }
       : block_rev { reverse $1 }

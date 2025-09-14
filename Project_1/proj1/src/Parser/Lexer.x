@@ -18,6 +18,8 @@ tokens:-
     "end"                               { const TEnd }
     "while"                             { const TWhile }
     "inv"                               { const TInv }
+    "pre"                               { const TPre }
+    "post"                              { const TPost }
     "do"                                { const TDo }
     "program"                           { const TProgram }
     "is"                                { const TIs }
@@ -50,6 +52,8 @@ data Token = TokenInt Int
            | TEnd
            | TWhile
            | TInv
+           | TPre
+           | TPost
            | TDo
            | TProgram
            | TIs

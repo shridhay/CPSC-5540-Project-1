@@ -1,4 +1,4 @@
-module Language (Name, ArithExp(..), Comparison(..), BoolExp(..), Statement(..), Block, Program) where
+module Language (Name, ArithExp(..), Comparison(..), BoolExp(..), Assertion(..), AssertionBlock, Statement(..), Block, Program) where
 
 type Name = String
 
@@ -31,13 +31,23 @@ data BoolExp = BCmp Comparison
              | BParens BoolExp
              deriving (Show)
 
+-- | Assertions
+data Assertion = Pre BoolExp 
+               | Post BoolExp
+               | Inv BoolExp
+               deriving (Show)
+
+type AssertionBlock = [Assertion]
+
+-- | Statements
+
 data Statement = Assign Name ArithExp
                | ParAssign Name Name ArithExp ArithExp
                | Write Name ArithExp ArithExp
                | If BoolExp Block Block
-               | While BoolExp {- [Assertion] -} Block
+               | While BoolExp AssertionBlock Block
                deriving (Show)
 
 type Block = [Statement]
 
-type Program = (Name, Block)
+type Program = (Name, AssertionBlock, Block)
