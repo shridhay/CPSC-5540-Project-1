@@ -99,7 +99,7 @@ assertion_block :: { AssertionBlock }
 
 assertion_block_rev :: { AssertionBlock }
                     : { [] }
-	               | assertion { [$1] }
+                    | assertion { [$1] }
                     | assertion_block_rev assertion {$2:$1}
 
 stmt :: { Statement }
