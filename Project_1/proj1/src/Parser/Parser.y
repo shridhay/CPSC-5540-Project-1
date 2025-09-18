@@ -30,6 +30,7 @@ import Parser.Lexer
     '<'         { TokenSymb "<" }
     '>'         { TokenSymb ">" }
     '!'         { TokenSymb "!" }
+    "==>"       { TokenSymb "==>" }
     
     "||"        { TokenSymb "||" }
     "&&"        { TokenSymb "&&" }
@@ -46,12 +47,18 @@ import Parser.Lexer
     "inv"       { TInv }
     "pre"       { TPre }
     "post"      { TPost }
+    "forall"    { TForall }
+    "exists"    { TExists }
     "program"   { TProgram }
     "is"        { TIs }
 
 
 %left '+' '-'
 %left '*' '/' '%'
+
+%nonassoc "exists"
+%nonassoc "forall"
+%right "==>"
 
 %left "||"
 %left "&&"
@@ -60,7 +67,7 @@ import Parser.Lexer
 %%
 
 prog :: { Program }
-     : "program" name assertion_block "is" block "end" { ($2, $3, $5) }
+     : "program" name pres posts "is" block "end" { ($2, $3, $4, $6) }
 
 arithExp :: { ArithExp }
          : int { Num $1 }
@@ -89,18 +96,46 @@ boolExp :: { BoolExp }
         | boolExp "&&" boolExp { BConj $1 $3 }
         | '(' boolExp ')' { BParens $2 }
 
-assertion :: { Assertion } 
-          : "pre" boolExp { Pre $2 }
-          | "post" boolExp { Post $2 }
-          | "inv" boolExp { Inv $2 }
+binders :: { [String] }
+        : name { [$1] }
+        | binders name { $2 : $1 }
 
-assertion_block :: { AssertionBlock }
-                : assertion_block_rev { reverse $1 }
+assn :: { Assertion }
+     : comp { ACmp $1 }
+     | '!' assn { ANot $2 }
+     | assn "||" assn { ADisj $1 $3 }
+     | assn "&&" assn { AConj $1 $3 }
+     | assn "==>" assn { AImpl $1 $3 }
+     | "forall" binders ',' assn { AForall $2 $4 }
+     | "exists" binders ',' assn { AExists $2 $4 }
+     | '(' assn ')' { AParens $2 }
 
-assertion_block_rev :: { AssertionBlock }
-                    : { [] }
-                    | assertion { [$1] }
-                    | assertion_block_rev assertion {$2:$1}
+pre :: { Assertion }
+    : "pre" assn { $2 }
+pres_rev :: { [Assertion] }
+         : { [] }
+         | pre { [$1] }
+         | pres_rev pre { $2 : $1 }
+pres :: { [Assertion] }
+     : pres_rev { reverse $1 }
+
+post :: { Assertion }
+     : "post" assn { $2 }
+posts_rev :: { [Assertion] }
+          : { [] }
+          | post { [$1] }
+          | posts_rev post { $2 : $1 }
+posts :: { [Assertion] }
+      : posts_rev { reverse $1 }
+
+inv :: { Assertion }
+    : "inv" assn { $2 }
+invs_rev :: { [Assertion] }
+     : { [] }
+     | inv { [$1] }
+     | invs_rev inv { $2 : $1 }
+invs :: { [Assertion] }
+     : invs_rev { reverse $1 }
 
 stmt :: { Statement }
      : name ":=" arithExp ';' { Assign $1 $3 }
@@ -108,7 +143,7 @@ stmt :: { Statement }
      | name '[' arithExp ']' ":=" arithExp ';' { Write $1 $3 $6 }
      | "if" boolExp "then" block "else" block "end" { If $2 $4 $6 }
      | "if" boolExp "then" block "end" { If $2 $4 [] }
-     | "while" boolExp assertion_block "do" block "end" { While $2 $3 $5 }
+     | "while" boolExp invs "do" block "end" { While $2 $3 $5 }
 
 block :: { Block }
       : block_rev { reverse $1 }
