@@ -1,6 +1,6 @@
 module Main (main) where
 
-import Verify
+import Verifier.Verify
 
 import System.Environment
 import System.IO.Error (catchIOError)
