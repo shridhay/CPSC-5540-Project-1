@@ -60,12 +60,12 @@ compileBody (c:cs) = Compose (compileCommand c) (compileBody cs)
 compilePre :: [Assertion] -> GuardedCommand
 compilePre [] = Assume (ACmp (Eq (Num 0) (Num 0)))
 compilePre [a1] = Assume a1
-comiplePre [a:as] = Compose (Assume a) (compilePre as) 
+comiplePre (a:as) = Compose (Assume a) (compilePre as) 
 
 compilePost :: [Assertion] -> GuardedCommand
 compilePost [] = Assume (ACmp (Eq (Num 0) (Num 0)))
 compilePost [a1] = Assert a1
-compilePost [a:as] = Compose (Assert a) (compilePost as) 
+compilePost (a:as) = Compose (Assert a) (compilePost as) 
 
 -- collapse :: [Maybe GuardedCommand] -> GuardedCommand
 -- collapse [] = Assume (ACmp (Eq (Num 0) (Num 0))) --True
