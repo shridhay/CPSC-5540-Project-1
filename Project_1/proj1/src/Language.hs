@@ -1,4 +1,4 @@
-module Language (ArithExp(..), Assertion(..), Block, BoolExp(..), Comparison(..), Program, Statement(..)) where
+module Language (ArithExp(..), Assertion(..), Block, BoolExp(..), Comparison(..), Program, Statement(..), Name) where
 
 type Name = String
 
