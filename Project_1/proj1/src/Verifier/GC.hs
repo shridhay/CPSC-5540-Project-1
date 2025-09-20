@@ -7,7 +7,6 @@ data GuardedCommand = Assume Assertion
               | Havoc Name
               | NonDet GuardedCommand GuardedCommand
               | Compose GuardedCommand GuardedCommand
-              deriving (Show) 
 
 subs :: ArithExp -> Name -> Name -> ArithExp
 subs (Num n) _ _ = (Num n)
@@ -48,7 +47,7 @@ compileCommand (ParAssign x1 x2 e1 e2) =
 --TODO: 
 -- compileCommand Write
 -- compileCommand While
---
+-- Array Implementations
 --
 -- 
     
@@ -72,7 +71,5 @@ compilePost (a:as) = Compose (Assert a) (compilePost as)
 -- collapse [gc] = case gc of
 --     Nothing -> 
 
-
 compileGC :: Program -> GuardedCommand
-compileGC (_, pre, post, body) = 
-    Compose (compilePre pre) (Compose (compileBody body) (compilePost post))
+compileGC (_, pre, post, body) = Compose (compilePre pre) (Compose (compileBody body) (compilePost post))
