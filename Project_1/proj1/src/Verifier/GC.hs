@@ -19,12 +19,12 @@ subs (Div l r) x tmp = Div (subs l x tmp) (subs r x tmp)
 subs (Mod l r) x tmp = Mod (subs l x tmp) (subs r x tmp)
 subs (Parens p) x tmp = Parens (subs p x tmp)
 
-boolToAssn :: BoolExp -> Assertion
-boolToAssn (BCmp b) = ACmp b
-boolToAssn (BNot b) = ANot (boolToAssn b)
-boolToAssn (BDisj b1 b2) = ADisj (boolToAssn b1) (boolToAssn b2)
-boolToAssn (BConj b1 b2) = AConj (boolToAssn b1) (boolToAssn b2)
-boolToAssn (BParens b) = AParens (boolToAssn b)
+boolToAssertion :: BoolExp -> Assertion
+boolToAssertion (BCmp b) = ACmp b
+boolToAssertion (BNot b) = ANot (boolToAssertion b)
+boolToAssertion (BDisj b1 b2) = ADisj (boolToAssertion b1) (boolToAssertion b2)
+boolToAssertion (BConj b1 b2) = AConj (boolToAssertion b1) (boolToAssertion b2)
+boolToAssertion (BParens b) = AParens (boolToAssertion b)
 
 compileCommand :: Statement -> GuardedCommand
 compileCommand (Assign x e) = 
@@ -43,33 +43,26 @@ compileCommand (ParAssign x1 x2 e1 e2) =
                 (Compose (Havoc x2)
                     (Compose (Assume (Eq (Var x1) (subs (subs e1 x1 tmp1) x2 tmp2)))
                         (Assume (Eq (Var x2) (subs (subs e2 x1 tmp1) x2 tmp2)))))))
-    
---TODO: 
--- compileCommand Write
--- compileCommand While
--- Array Implementations
---
--- 
+
+compilePre :: [Assertion] -> GuardedCommand
+compilePre [] = Assume (ACmp (Eq (Num 0) (Num 0)))
+compilePre [a1] = Assume a1
+comiplePre (a:as) = Compose (Assume a) (compilePre as) 
     
 compileBody :: Block -> GuardedCommand
 compileBody [] = Assume (ACmp (Eq (Num 0) (Num 0)))
 compileBody [c1] = compileCommand c1
 compileBody (c:cs) = Compose (compileCommand c) (compileBody cs)
 
-compilePre :: [Assertion] -> GuardedCommand
-compilePre [] = Assume (ACmp (Eq (Num 0) (Num 0)))
-compilePre [a1] = Assume a1
-comiplePre (a:as) = Compose (Assume a) (compilePre as) 
-
 compilePost :: [Assertion] -> GuardedCommand
 compilePost [] = Assume (ACmp (Eq (Num 0) (Num 0)))
 compilePost [a1] = Assert a1
 compilePost (a:as) = Compose (Assert a) (compilePost as) 
 
--- collapse :: [Maybe GuardedCommand] -> GuardedCommand
--- collapse [] = Assume (ACmp (Eq (Num 0) (Num 0))) --True
--- collapse [gc] = case gc of
---     Nothing -> 
-
 compileGC :: Program -> GuardedCommand
 compileGC (_, pre, post, body) = Compose (compilePre pre) (Compose (compileBody body) (compilePost post))
+
+--TODO: 
+-- compileCommand Write
+-- compileCommand While
+-- Array Implementations
