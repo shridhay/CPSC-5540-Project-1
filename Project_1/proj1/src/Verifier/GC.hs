@@ -54,6 +54,17 @@ compileCommand (ParAssign x1 x2 e1 e2) =
                     (Compose (Assume (ACmp(Eq (Var x1) (subs (subs e1 x1 (x1 ++ "tmp")) x2 (x2 ++ "tmp")))))
                         (Assume (ACmp(Eq (Var x2) (subs (subs e2 x1 (x1 ++ "tmp")) x2 (x2 ++ "tmp")))))))))
 
+compileCommand (While g invs cmds) = 
+    Compose (combineAssertions invs)       --- TODO
+        (Compose (havocBody cmds)          --- TODO
+            (Compose (combineAssumes invs) --- TODO
+                (NonDet 
+                    (Compose (Assume (ACmp g)) 
+                        (Compose (compileBody cmds)
+                            (Compose (combineAssertions invs)
+                                (Assume (ACmp (Neq (Num 0) (Num 0)))))))
+                    (Assume (ACmp (BNot g))))))
+
 compilePre :: [Assertion] -> GuardedCommand
 compilePre [] = Assume (ACmp (Eq (Num 0) (Num 0)))
 compilePre [a1] = Assume a1
