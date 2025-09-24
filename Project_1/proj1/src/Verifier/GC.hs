@@ -75,7 +75,6 @@ compileGC (_, pre, post, body) = Compose (compilePre pre) (Compose (compileBody 
 {-
 
 --TODO: 
--- compileCommand Write
 -- compileCommand While
 -- Array Implementations
 
