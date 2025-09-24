@@ -33,21 +33,21 @@ boolToAssertion (BParens b) = AParens (boolToAssertion b)
 
 compileCommand :: Statement -> GuardedCommand
 compileCommand (Assign x e) = 
-    Compose (Assume (Eq (Var tmp) (Var x)))
+    Compose (Assume (ACmp(Eq (Var tmp) (Var x))))
         (Compose (Havoc x))
-            (Assume (Eq (Var x) (subs e x tmp)))
+            (Assume (ACmp(Eq (Var x) (subs e x tmp))))
 
 compileCommand (If b c1 c2) = 
     NonDet (Compose (Assume (boolToAssn b)) (compileCommand c1))
         (Compose (Assume (ANot (boolToAssn b))) (compileCommand c2))
 
 compileCommand (ParAssign x1 x2 e1 e2) =
-    Compose (Assume (Eq (Var tmp1) (Var x1)))
-        (Compose (Assume (Eq (Var tmp2) (Var x2)))
+    Compose (Assume (ACmp(Eq (Var tmp1) (Var x1))))
+        (Compose (Assume (ACmp(Eq (Var tmp2) (Var x2))))
             (Compose (Havoc x1)
                 (Compose (Havoc x2)
-                    (Compose (Assume (Eq (Var x1) (subs (subs e1 x1 tmp1) x2 tmp2)))
-                        (Assume (Eq (Var x2) (subs (subs e2 x1 tmp1) x2 tmp2)))))))
+                    (Compose (Assume (ACmp(Eq (Var x1) (subs (subs e1 x1 tmp1) x2 tmp2))))
+                        (Assume (ACmp(Eq (Var x2) (subs (subs e2 x1 tmp1) x2 tmp2))))))))
 
 compilePre :: [Assertion] -> GuardedCommand
 compilePre [] = Assume (ACmp (Eq (Num 0) (Num 0)))
@@ -67,7 +67,20 @@ compilePost (a:as) = Compose (Assert a) (compilePost as)
 compileGC :: Program -> GuardedCommand
 compileGC (_, pre, post, body) = Compose (compilePre pre) (Compose (compileBody body) (compilePost post))
 
+{-
+
 --TODO: 
 -- compileCommand Write
 -- compileCommand While
 -- Array Implementations
+
+
+
+
+
+
+
+
+
+-}
+
