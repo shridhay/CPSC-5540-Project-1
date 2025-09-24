@@ -33,21 +33,26 @@ boolToAssertion (BParens b) = AParens (boolToAssertion b)
 
 compileCommand :: Statement -> GuardedCommand
 compileCommand (Assign x e) = 
-    Compose (Assume (ACmp(Eq (Var tmp) (Var x))))
-        (Compose (Havoc x))
-            (Assume (ACmp(Eq (Var x) (subs e x tmp))))
+    Compose (Assume (ACmp(Eq (Var (x ++ "tmp")) (Var x))))
+        (Compose (Havoc x)
+            (Assume (ACmp(Eq (Var x) (subs e x (x ++ "tmp"))))))
+
+compileCommand (Write a i v) = 
+    Compose (Assume (AForall "idx" (ACmp (Eq (Read (x ++ "tmp") (Var "idx")) (Read a (Var "idx"))))))
+        (Compose (Havoc a)
+            (Assume (AForall "idx" (ACmp (Eq (Read a (Var "idx")) (Read (Write (x ++ "tmp") i v) (Var "idx")))))))
 
 compileCommand (If b c1 c2) = 
     NonDet (Compose (Assume (boolToAssn b)) (compileCommand c1))
         (Compose (Assume (ANot (boolToAssn b))) (compileCommand c2))
 
 compileCommand (ParAssign x1 x2 e1 e2) =
-    Compose (Assume (ACmp(Eq (Var tmp1) (Var x1))))
-        (Compose (Assume (ACmp(Eq (Var tmp2) (Var x2))))
+    Compose (Assume (ACmp(Eq (Var (x1 ++ "tmp")) (Var x1))))
+        (Compose (Assume (ACmp(Eq (Var (x2 ++ "tmp")) (Var x2))))
             (Compose (Havoc x1)
                 (Compose (Havoc x2)
-                    (Compose (Assume (ACmp(Eq (Var x1) (subs (subs e1 x1 tmp1) x2 tmp2))))
-                        (Assume (ACmp(Eq (Var x2) (subs (subs e2 x1 tmp1) x2 tmp2))))))))
+                    (Compose (Assume (ACmp(Eq (Var x1) (subs (subs e1 x1 (x1 ++ "tmp")) x2 (x2 ++ "tmp")))))
+                        (Assume (ACmp(Eq (Var x2) (subs (subs e2 x1 (x1 ++ "tmp")) x2 (x2 ++ "tmp")))))))))
 
 compilePre :: [Assertion] -> GuardedCommand
 compilePre [] = Assume (ACmp (Eq (Num 0) (Num 0)))
