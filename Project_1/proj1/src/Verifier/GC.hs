@@ -1,6 +1,11 @@
 module Verifier.GC (GuardedCommand(..)) where
 
 import Language
+import Control.Applicative
+import Control.Monad ( join )
+import Data.Maybe
+import qualified Data.Traversable as T
+import Z3.Monad
 
 data GuardedCommand = Assume Assertion
               | Assert Assertion
