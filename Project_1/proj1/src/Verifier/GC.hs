@@ -30,6 +30,18 @@ subs (Div l r) x tmp = Div (subs l x tmp) (subs r x tmp)
 subs (Mod l r) x tmp = Mod (subs l x tmp) (subs r x tmp)
 subs (Parens p) x tmp = Parens (subs p x tmp)
 
+subsArr :: ArithExp -> Name -> Name -> ArithExp
+subsArr (Num n) _ _ = (Num n)
+subsArr (Var varName) _ _ = (Var varName)
+subsArr (Read arrName idx) x tmp = 
+    if (arrName == x) then (Read tmp (subsArr idx x tmp)) else (Read arrName (subsArr idx x tmp))
+subsArr (Add l r) x tmp = Add (subsArr l x tmp) (subsArr r x tmp)
+subsArr (Sub l r) x tmp = Sub (subsArr l x tmp) (subsArr r x tmp)
+subsArr (Mul l r) x tmp = Mul (subsArr l x tmp) (subsArr r x tmp)
+subsArr (Div l r) x tmp = Div (subsArr l x tmp) (subsArr r x tmp)
+subsArr (Mod l r) x tmp = Mod (subsArr l x tmp) (subsArr r x tmp)
+subsArr (Parens p) x tmp = Parens (subsArr p x tmp)
+
 boolToAssertion :: BoolExp -> Assertion
 boolToAssertion (BCmp b) = ACmp b
 boolToAssertion (BNot b) = ANot (boolToAssertion b)
@@ -48,7 +60,11 @@ compileCommand (Write a i v) = do
     tmpA <- freshVar "arr"
     return (Compose (Assume (AForall ["idx"] (ACmp (Eq (Read tmpA (Var "idx")) (Read a (Var "idx"))))))
         (Compose (Havoc a)
-            (Assume (AForall ["idx"] (ACmp (Eq (Read a (Var "idx")) (Read tmpA (Var "idx"))))))))
+            (Assume (AConj 
+                (AForall ["idx"] 
+                    (AImpl (ACmp (Neq (Var "idx") i)) 
+                        (ACmp (Eq (Read a (Var "idx")) (Read tmpA (Var "idx"))))))
+                (ACmp (Eq (Read a i) (subsArr v a tmpA)))))))
 
 compileCommand (If b c1 c2) = do
     c1GC <- (compileBlock c1)
@@ -79,7 +95,7 @@ compileCommand (While g invs cmds) = do
                     (Assume (boolToAssertion (BNot g)))))))
 
 havocArith :: ArithExp -> GuardedCommand 
-havocArith (Num n) = assumeTrue
+havocArith (Num _) = assumeTrue
 havocArith (Var varName) = Havoc varName
 havocArith (Read arrName idx) = Compose (Havoc arrName) (havocArith idx)
 havocArith (Add l r) = Compose (havocArith l) (havocArith r)
@@ -128,6 +144,7 @@ havocComp :: Comparison -> GuardedCommand
 havocComp (Eq a1 a2) = Compose (havocArith a1) (havocArith a2)
 havocComp (Neq a1 a2) = Compose (havocArith a1) (havocArith a2)
 havocComp (Le a1 a2) = Compose (havocArith a1) (havocArith a2)
+havocComp (Ge a1 a2) = Compose (havocArith a1) (havocArith a2)
 havocComp (Lt a1 a2) = Compose (havocArith a1) (havocArith a2)
 havocComp (Gt a1 a2) = Compose (havocArith a1) (havocArith a2)
 
