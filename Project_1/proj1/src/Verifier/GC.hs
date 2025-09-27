@@ -1,11 +1,11 @@
-module Verifier.GC (GuardedCommand(..)) where
+module Verifier.GC (GuardedCommand(..), compileGC) where
 
 import Language
 import Control.Applicative
 import Control.Monad ( join )
 import Data.Maybe
 import qualified Data.Traversable as T
-import Z3.Monad
+--import Z3.Monad
 import Control.Monad.State.Lazy
 
 data GuardedCommand = Assume Assertion
@@ -13,6 +13,7 @@ data GuardedCommand = Assume Assertion
               | Havoc Name
               | NonDet GuardedCommand GuardedCommand
               | Compose GuardedCommand GuardedCommand
+              deriving (Show)
 
 -- does nothing
 assumeTrue :: GuardedCommand
@@ -45,34 +46,37 @@ compileCommand (Assign x e) = do
 
 compileCommand (Write a i v) = do
     tmpA <- freshVar "arr"
-    return (Compose (Assume (AForall "idx" (ACmp (Eq (Read tmpA (Var "idx")) (Read a (Var "idx"))))))
+    return (Compose (Assume (AForall ["idx"] (ACmp (Eq (Read tmpA (Var "idx")) (Read a (Var "idx"))))))
         (Compose (Havoc a)
-            (Assume (AForall "idx" (ACmp (Eq (Read a (Var "idx")) (Read (Write tmpA i v) (Var "idx"))))))))
+            (Assume (AForall ["idx"] (ACmp (Eq (Read a (Var "idx")) (Read tmpA (Var "idx"))))))))
 
 compileCommand (If b c1 c2) = do
-    return (NonDet (Compose (Assume (boolToAssn b)) (compileCommand c1))
-        (Compose (Assume (ANot (boolToAssn b))) (compileCommand c2)))
+    c1GC <- (compileBlock c1)
+    c2GC <- (compileBlock c2)
+    return (NonDet (Compose (Assume (boolToAssertion b)) c1GC)
+        (Compose (Assume (ANot (boolToAssertion b))) c2GC))
 
 compileCommand (ParAssign x1 x2 e1 e2) = do
     tmp1 <- freshVar "num" 
     tmp2 <- freshVar "num"
-    Compose (Assume (ACmp (Eq (Var tmp1) (Var x1))))
+    return (Compose (Assume (ACmp (Eq (Var tmp1) (Var x1))))
         (Compose (Assume (ACmp (Eq (Var tmp2) (Var x2))))
             (Compose (Havoc x1)
                 (Compose (Havoc x2)
                     (Compose (Assume (ACmp (Eq (Var x1) (subs (subs e1 x1 tmp1) x2 tmp2))))
-                        (Assume (ACmp (Eq (Var x2) (subs (subs e2 x1 tmp1) x2 tmp2))))))))
+                        (Assume (ACmp (Eq (Var x2) (subs (subs e2 x1 tmp1) x2 tmp2)))))))))
 
 compileCommand (While g invs cmds) = do
-    Compose (combineAssertions invs)      
+    whileBodyCmds <- (compileBlock cmds)
+    return (Compose (combineAssertions invs)      
         (Compose (havocBlock cmds)                 
             (Compose (combineAssumes invs)
                 (NonDet 
-                    (Compose (Assume (ACmp g)) 
-                        (Compose (compileBody cmds)
+                    (Compose (Assume (boolToAssertion g)) 
+                        (Compose whileBodyCmds
                             (Compose (combineAssertions invs)
                                 (Assume (ACmp (Neq (Num 0) (Num 0)))))))
-                    (Assume (ACmp (BNot g))))))
+                    (Assume (boolToAssertion (BNot g)))))))
 
 havocArith :: ArithExp -> GuardedCommand 
 havocArith (Num n) = assumeTrue
@@ -98,7 +102,7 @@ havocAssert (AParens p) = havocAssert p
 havocAssertionBlock :: [Assertion] -> GuardedCommand
 havocAssertionBlock [] = assumeTrue
 havocAssertionBlock [a1] = havocAssert a1
-havocAssertionBlock (a:as) = Compose (havocAssert a) (havocAssertionBlock cs)
+havocAssertionBlock (a:as) = Compose (havocAssert a) (havocAssertionBlock as)
 
 havocBool :: BoolExp -> GuardedCommand 
 havocBool (BCmp comparison) = havocComp comparison
@@ -118,7 +122,7 @@ havocCommand (Write a i v) = Compose (Havoc a) (Compose (havocArith i) (havocAri
 havocCommand (If b c1 c2) = Compose (havocBool b) (Compose (havocBlock c1) (havocBlock c2))
 havocCommand (ParAssign x1 x2 e1 e2) = 
     Compose (Havoc x1) (Compose (Havoc x2) (Compose (havocArith e1) (havocArith e2)))
-havocCommand (While g invs cmds) = Compose (havocAssertionBlock g) (havocBlock cmds)
+havocCommand (While g invs cmds) = Compose (havocBool g) (Compose (havocAssertionBlock invs) (havocBlock cmds))
 
 havocComp :: Comparison -> GuardedCommand
 havocComp (Eq a1 a2) = Compose (havocArith a1) (havocArith a2)
@@ -135,25 +139,25 @@ havocNameList (c:cs) = Compose (Havoc c) (havocNameList cs)
 combineAssumes :: [Assertion] -> GuardedCommand
 combineAssumes [] = assumeTrue
 combineAssumes [a1] = Assume a1
-combineAssumes (a:as) = Compose (Assume a) (compilePre as) 
+combineAssumes (a:as) = Compose (Assume a) (combineAssumes as) 
     
-compileBody :: Block -> State Int GuardedCommand
-compileBody [] = return assumeTrue
-compileBody [c1] = return (compileCommand c1)
-compileBody (c:cs) = do 
+compileBlock :: Block -> State Int GuardedCommand
+compileBlock [] = return assumeTrue
+compileBlock [c1] = compileCommand c1
+compileBlock (c:cs) = do 
     firstCmd <- compileCommand c
-    restCmds <- compileBody cs
+    restCmds <- compileBlock cs
     return (Compose firstCmd restCmds)
 
 combineAssertions :: [Assertion] -> GuardedCommand
 combineAssertions [] = assumeTrue
 combineAssertions [a1] = Assert a1
-combineAssertions (a:as) = Compose (Assert a) (compilePost as) 
+combineAssertions (a:as) = Compose (Assert a) (combineAssertions as) 
 
 compileGCM :: Program -> State Int GuardedCommand
 compileGCM (_, pre, post, body) = do
-    compiledBody <- (compileBody body)
-    return Compose (combineAssumes pre) (Compose compiledBody (combineAssertions post))
+    compiledBody <- (compileBlock body)
+    return (Compose (combineAssumes pre) (Compose compiledBody (combineAssertions post)))
 
 compileGC :: Program -> GuardedCommand
 compileGC program = evalState (compileGCM program) 0
