@@ -1,12 +1,8 @@
 module Verifier.GC (GuardedCommand(..), compileGC) where
 
 import Language
-import Control.Applicative
-import Control.Monad ( join )
-import Data.Maybe
-import qualified Data.Traversable as T
---import Z3.Monad
-import Control.Monad.State.Lazy
+import Data.SBV
+import Data.SBV.Control
 
 data GuardedCommand = Assume Assertion
               | Assert Assertion
@@ -178,22 +174,6 @@ compileGCM (_, pre, post, body) = do
 
 compileGC :: Program -> GuardedCommand
 compileGC program = evalState (compileGCM program) 0
-
-{-
-
---TODO: 
--- compileCommand While
--- Array Implementations
-
-
-
-
-
-
-
-
-
--}
 
 freshVar :: String -> State Int Name
 freshVar prefix = do
