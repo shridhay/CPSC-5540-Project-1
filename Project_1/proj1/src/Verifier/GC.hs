@@ -61,9 +61,9 @@ compileCommand (ParAssign x1 x2 e1 e2) = do
 
 compileCommand (While g invs cmds) = do
     cleanBody <- havocBody cmds
-    Compose (combineAssertions invs)       --- TODO
+    Compose (combineAssertions invs)      
         (Compose cleanBody                 --- TODO
-            (Compose (combineAssumes invs) --- TODO
+            (Compose (combineAssumes invs)
                 (NonDet 
                     (Compose (Assume (ACmp g)) 
                         (Compose (compileBody cmds)
@@ -71,10 +71,11 @@ compileCommand (While g invs cmds) = do
                                 (Assume (ACmp (Neq (Num 0) (Num 0)))))))
                     (Assume (ACmp (BNot g))))))
 
-compilePre :: [Assertion] -> GuardedCommand
-compilePre [] = Assume (ACmp (Eq (Num 0) (Num 0)))
-compilePre [a1] = Assume a1
-comiplePre (a:as) = Compose (Assume a) (compilePre as) 
+
+combineAssumes :: [Assertion] -> GuardedCommand
+combineAssumes [] = Assume (ACmp (Eq (Num 0) (Num 0)))
+combineAssumes [a1] = Assume a1
+combineAssumes (a:as) = Compose (Assume a) (compilePre as) 
     
 compileBody :: Block -> State Int GuardedCommand
 compileBody [] = return (Assume (ACmp (Eq (Num 0) (Num 0))))
@@ -84,15 +85,15 @@ compileBody (c:cs) = do
     restCmds <- compileBody cs
     return (Compose firstCmd restCmds)
 
-compilePost :: [Assertion] -> GuardedCommand
-compilePost [] = Assume (ACmp (Eq (Num 0) (Num 0)))
-compilePost [a1] = Assert a1
-compilePost (a:as) = Compose (Assert a) (compilePost as) 
+combineAssertions :: [Assertion] -> GuardedCommand
+combineAssertions [] = Assume (ACmp (Eq (Num 0) (Num 0)))
+combineAssertions [a1] = Assert a1
+combineAssertions (a:as) = Compose (Assert a) (compilePost as) 
 
 compileGCM :: Program -> State Int GuardedCommand
 compileGCM (_, pre, post, body) = do
     compiledBody <- (compileBody body)
-    return Compose (compilePre pre) (Compose compiledBody (compilePost post))
+    return Compose (combineAssumes pre) (Compose compiledBody (combineAssertions post))
 
 compileGC :: Program -> GuardedCommand
 compileGC program = evalState (compileGCM program) 0
