@@ -6,6 +6,7 @@ import Control.Monad ( join )
 import Data.Maybe
 import qualified Data.Traversable as T
 import Z3.Monad
+import Control.Monad.State.Lazy
 
 data GuardedCommand = Assume Assertion
               | Assert Assertion
@@ -31,32 +32,37 @@ boolToAssertion (BDisj b1 b2) = ADisj (boolToAssertion b1) (boolToAssertion b2)
 boolToAssertion (BConj b1 b2) = AConj (boolToAssertion b1) (boolToAssertion b2)
 boolToAssertion (BParens b) = AParens (boolToAssertion b)
 
-compileCommand :: Statement -> GuardedCommand
-compileCommand (Assign x e) = 
-    Compose (Assume (ACmp(Eq (Var (x ++ "tmp")) (Var x))))
+compileCommand :: Statement -> State Int GuardedCommand
+compileCommand (Assign x e) = do
+    tmp <- freshVar "num"
+    return (Compose (Assume (ACmp(Eq (Var tmp) (Var x))))
         (Compose (Havoc x)
-            (Assume (ACmp(Eq (Var x) (subs e x (x ++ "tmp"))))))
+            (Assume (ACmp(Eq (Var x) (subs e x tmp))))))
 
-compileCommand (Write a i v) = 
-    Compose (Assume (AForall "idx" (ACmp (Eq (Read (x ++ "tmp") (Var "idx")) (Read a (Var "idx"))))))
+compileCommand (Write a i v) = do
+    tmpA <- freshVar "arr"
+    return (Compose (Assume (AForall "idx" (ACmp (Eq (Read tmpA (Var "idx")) (Read a (Var "idx"))))))
         (Compose (Havoc a)
-            (Assume (AForall "idx" (ACmp (Eq (Read a (Var "idx")) (Read (Write (x ++ "tmp") i v) (Var "idx")))))))
+            (Assume (AForall "idx" (ACmp (Eq (Read a (Var "idx")) (Read (Write tmpA i v) (Var "idx"))))))))
 
-compileCommand (If b c1 c2) = 
-    NonDet (Compose (Assume (boolToAssn b)) (compileCommand c1))
-        (Compose (Assume (ANot (boolToAssn b))) (compileCommand c2))
+compileCommand (If b c1 c2) = do
+    return (NonDet (Compose (Assume (boolToAssn b)) (compileCommand c1))
+        (Compose (Assume (ANot (boolToAssn b))) (compileCommand c2)))
 
-compileCommand (ParAssign x1 x2 e1 e2) =
-    Compose (Assume (ACmp(Eq (Var (x1 ++ "tmp")) (Var x1))))
-        (Compose (Assume (ACmp(Eq (Var (x2 ++ "tmp")) (Var x2))))
+compileCommand (ParAssign x1 x2 e1 e2) = do
+    tmp1 <- freshVar "num" 
+    tmp2 <- freshVar "num"
+    Compose (Assume (ACmp(Eq (Var tmp1) (Var x1))))
+        (Compose (Assume (ACmp(Eq (Var tmp2) (Var x2))))
             (Compose (Havoc x1)
                 (Compose (Havoc x2)
-                    (Compose (Assume (ACmp(Eq (Var x1) (subs (subs e1 x1 (x1 ++ "tmp")) x2 (x2 ++ "tmp")))))
-                        (Assume (ACmp(Eq (Var x2) (subs (subs e2 x1 (x1 ++ "tmp")) x2 (x2 ++ "tmp")))))))))
+                    (Compose (Assume (ACmp(Eq (Var x1) (subs (subs e1 x1 tmp1) x2 tmp2))))
+                        (Assume (ACmp(Eq (Var x2) (subs (subs e2 x1 tmp1) x2 tmp2))))))))
 
-compileCommand (While g invs cmds) = 
+compileCommand (While g invs cmds) = do
+    cleanBody <- havocBody cmds
     Compose (combineAssertions invs)       --- TODO
-        (Compose (havocBody cmds)          --- TODO
+        (Compose cleanBody                 --- TODO
             (Compose (combineAssumes invs) --- TODO
                 (NonDet 
                     (Compose (Assume (ACmp g)) 
@@ -70,18 +76,26 @@ compilePre [] = Assume (ACmp (Eq (Num 0) (Num 0)))
 compilePre [a1] = Assume a1
 comiplePre (a:as) = Compose (Assume a) (compilePre as) 
     
-compileBody :: Block -> GuardedCommand
-compileBody [] = Assume (ACmp (Eq (Num 0) (Num 0)))
-compileBody [c1] = compileCommand c1
-compileBody (c:cs) = Compose (compileCommand c) (compileBody cs)
+compileBody :: Block -> State Int GuardedCommand
+compileBody [] = return (Assume (ACmp (Eq (Num 0) (Num 0))))
+compileBody [c1] = return (compileCommand c1)
+compileBody (c:cs) = do 
+    firstCmd <- compileCommand c
+    restCmds <- compileBody cs
+    return (Compose firstCmd restCmds)
 
 compilePost :: [Assertion] -> GuardedCommand
 compilePost [] = Assume (ACmp (Eq (Num 0) (Num 0)))
 compilePost [a1] = Assert a1
 compilePost (a:as) = Compose (Assert a) (compilePost as) 
 
+compileGCM :: Program -> State Int GuardedCommand
+compileGCM (_, pre, post, body) = do
+    compiledBody <- (compileBody body)
+    return Compose (compilePre pre) (Compose compiledBody (compilePost post))
+
 compileGC :: Program -> GuardedCommand
-compileGC (_, pre, post, body) = Compose (compilePre pre) (Compose (compileBody body) (compilePost post))
+compileGC program = evalState (compileGCM program) 0
 
 {-
 
@@ -99,3 +113,8 @@ compileGC (_, pre, post, body) = Compose (compilePre pre) (Compose (compileBody 
 
 -}
 
+freshVar :: String -> State Int Name
+freshVar prefix = do
+  n <- get
+  put (n + 1)
+  return (prefix ++ "--temp--" ++ show n)
