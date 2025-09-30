@@ -3,6 +3,7 @@ module Verifier.GC (GuardedCommand(..), compileGC) where
 import Language
 import Data.SBV
 import Data.SBV.Control
+import Z3.Monad
 
 data GuardedCommand = Assume Assertion
               | Assert Assertion
