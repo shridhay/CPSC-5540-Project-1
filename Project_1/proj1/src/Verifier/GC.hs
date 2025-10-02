@@ -239,6 +239,43 @@ wpM (NonDet c1 c2) b = do
 wp :: GuardedCommand -> Assertion -> Assertion
 wp gc a = evalState (wpM gc a) 0
 
+wpToZ3 :: Assertion -> String
+wpToZ3 a = varMapToZ3String (getVar a) ++ assertToZ3 a
+
+assertToZ3 :: Assertion -> String
+assertToZ3 (ACmp comparison) = comparisonToZ3 comparison
+assertToZ3 (ANot a) = "(not " ++ assertToZ3 a ++ ")"
+assertToZ3 (ADisj a1 a2) = "(or " ++ assertToZ3 a1 ++ " " ++ assertToZ3 a2 ++ ")"
+assertToZ3 (AConj a1 a2) = "(and " ++ assertToZ3 a1 ++ " " ++ assertToZ3 a2 ++ ")"
+assertToZ3 (AImpl a1 a2) = "(=> " ++ assertToZ3 a1 ++ " " ++ assertToZ3 a2 ++ ")"
+assertToZ3 (AForall n a) = "(forall (" ++ forallVarString n ++ ") " ++ assertToZ3 a ++ ")"
+assertToZ3 (AExists n a) = "(exists (" ++ forallVarString n ++ ") " ++ assertToZ3 a ++ ")"
+assertToZ3 (AParens p) = assertToZ3 p
+
+forallVarString :: [Name] -> String 
+forallVarString [] = ""
+forallVarString [n] = "(" ++ n ++ " Int)"
+forallVarString (n:ns) = "(" ++ n ++ " Int)" ++ forallVarString ns
+
+comparisonToZ3 :: Comparison -> String
+comparisonToZ3 (Eq a1 a2) = "(= " ++ arithToZ3 a1 ++ " " ++ arithToZ3 a2 ++ ")"
+comparisonToZ3 (Neq a1 a2) = "(not (= " ++ arithToZ3 a1 ++ " " ++ arithToZ3 a2 ++ "))"
+comparisonToZ3 (Le a1 a2) = "(<= " ++ arithToZ3 a1 ++ " " ++ arithToZ3 a2 ++ ")"
+comparisonToZ3 (Ge a1 a2) = "(>= " ++ arithToZ3 a1 ++ " " ++ arithToZ3 a2 ++ ")"
+comparisonToZ3 (Lt a1 a2) = "(< " ++ arithToZ3 a1 ++ " " ++ arithToZ3 a2 ++ ")"
+comparisonToZ3 (Gt a1 a2) = "(> " ++ arithToZ3 a1 ++ " " ++ arithToZ3 a2 ++ ")"
+
+arithToZ3 :: ArithExp -> String
+arithToZ3 (Num n) = show n
+arithToZ3 (Var v) = v 
+arithToZ3 (Read a i) = "(select " ++ a ++ " " ++ arithToZ3 i ++ ")"
+arithToZ3 (Add a1 a2) = "(+ " ++ arithToZ3 a1 ++ " " ++ arithToZ3 a2 ++ ")"
+arithToZ3 (Sub a1 a2) = "(- " ++ arithToZ3 a1 ++ " " ++ arithToZ3 a2 ++ ")"
+arithToZ3 (Mul a1 a2) = "(* " ++ arithToZ3 a1 ++ " " ++ arithToZ3 a2 ++ ")"
+arithToZ3 (Div a1 a2) = "(/ " ++ arithToZ3 a1 ++ " " ++ arithToZ3 a2 ++ ")"
+arithToZ3 (Mod a1 a2) = "(mod " ++ arithToZ3 a1 ++ " " ++ arithToZ3 a2 ++ ")"
+arithToZ3 (Paren a) = arithToZ3 a
+
 getVar :: Assertion -> Map Name VarT
 getVar (ACmp c) = getVarCmp c
 getVar (ANot a) = getVar a
@@ -282,27 +319,3 @@ varToZ3String k v = "(declare-const " ++ k ++ " " ++ (varTasString v) ++ ")"
 
 varMapToZ3String :: Map Name VarT -> String
 varMapToZ3String m = (Map.fold (++) "" (Map.mapWithKey varToZ3String m))
-
-
-
--- makeZ3Command :: Assertion -> String
--- makeZ3Command (ACmp comparison) = ACmp (makeZ3Command comparison) 
--- makeZ3Command (ANot a) = ANot (wpSubsAssert a x xa)
--- makeZ3Command (ADisj a1 a2) = ADisj (wpSubsAssert a1 x xa) (wpSubsAssert a2 x xa)
--- makeZ3Command (AConj a1 a2) = AConj (wpSubsAssert a1 x xa) (wpSubsAssert a2 x xa)
--- makeZ3Command (AImpl a1 a2) = AImpl (wpSubsAssert a1 x xa) (wpSubsAssert a2 x xa)
--- makeZ3Command (AForall n a) = AForall (wpSubsNameList n x xa) (wpSubsAssert a x xa)
--- makeZ3Command (AExists n a) = AExists (wpSubsNameList n x xa) (wpSubsAssert a x xa)
--- makeZ3Command (AParens p) = AParens (wpSubsAssert p x xa)
-
--- wp (Assert Assertion) = Assertion
--- wp (Havoc Name) = 
--- wp (Compose GuardedCommand GuardedCommand) = AConj 
-
--- wp_assert :: GuardedCommand -> Assertion
-
--- wp_havoc :: GuardedCommand -> State -> Assertion
-
--- wp_compose :: GuardedCommand -> Assertion
-
--- wp_non_det :: GuardedCommand -> Assertion
