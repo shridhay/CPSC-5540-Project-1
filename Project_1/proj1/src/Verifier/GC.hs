@@ -1,10 +1,11 @@
-module Verifier.GC (GuardedCommand(..), compileGC) where
+module Verifier.GC (GuardedCommand(..), getZ3String) where
 
 import Language
-import Data.SBV
-import Data.SBV.Control
+-- import Data.SBV
+-- import Data.SBV.Control
 import Data.Map (Map)
 import qualified Data.Map as Map
+import Control.Monad.State.Lazy
 
 data VarT = IntT | ArrT
 
@@ -14,6 +15,9 @@ data GuardedCommand = Assume Assertion
               | NonDet GuardedCommand GuardedCommand
               | Compose GuardedCommand GuardedCommand
               deriving (Show)
+
+getZ3String :: Program -> String
+getZ3String p = wpToZ3 (wp (compileGC p))
 
 assumeTrue :: GuardedCommand
 assumeTrue = Assume (ACmp (Eq (Num 0) (Num 0)))
@@ -206,7 +210,7 @@ wpSubsComp (Gt a1 a2) x xa = Gt (wpSubsArith a1 x xa) (wpSubsArith a2 x xa)
 
 wpSubsArith :: ArithExp -> Name -> Name -> ArithExp
 wpSubsArith (Num n) _ _ = (Num n)
-wpSubsArith (Var varName) x xa = if (varName == x) then (Var tmp) else (Var varName)
+wpSubsArith (Var varName) x xa = if (varName == x) then (Var xa) else (Var varName)
 wpSubsArith (Add l r) x xa = Add (wpSubsArith l x xa) (wpSubsArith r x xa)
 wpSubsArith (Sub l r) x xa = Sub (wpSubsArith l x xa) (wpSubsArith r x xa)
 wpSubsArith (Mul l r) x xa = Mul (wpSubsArith l x xa) (wpSubsArith r x xa)
@@ -219,13 +223,13 @@ wpSubsArith (Read arrName idx) x xa =
 wpSubsNameList :: [Name] -> Name -> Name -> [Name]
 wpSubsNameList [] _ _ = []
 wpSubsNameList [c1] x xa = if (c1 == x) then [xa] else [c1]
-wpSubsNameList (c:cs) x xa = if (c == x) then (c : (wpSubsNameList cs x xa)) else (c : (wpSubsNameList cs x xa))
+wpSubsNameList (c:cs) x xa = if (c == x) then (xa : (wpSubsNameList cs x xa)) else (c : (wpSubsNameList cs x xa))
 
-wpM :: GaurdedCommand -> Assertion -> State Int Assertion
+wpM :: GuardedCommand -> Assertion -> State Int Assertion
 wpM (Assume assertion) b = return (AImpl assertion b)
 wpM (Assert assertion) b = return (AConj assertion b)
 wpM (Havoc x) b = do 
-    xa <- freshVar
+    xa <- freshVar (x ++ "a")
     return (wpSubsAssert b x xa)
 wpM (Compose c1 c2) b = do 
     r2 <- (wpM c2 b)
@@ -236,11 +240,11 @@ wpM (NonDet c1 c2) b = do
     r2 <- (wpM c2 b)
     return (AConj r1 r2)
 
-wp :: GuardedCommand -> Assertion -> Assertion
-wp gc a = evalState (wpM gc a) 0
+wp :: GuardedCommand -> Assertion
+wp gc = evalState (wpM gc (ACmp (Eq (Num 0) (Num 0)))) 0
 
 wpToZ3 :: Assertion -> String
-wpToZ3 a = varMapToZ3String (getVar a) ++ assertToZ3 a
+wpToZ3 a = varMapToZ3String (getVar a) ++ "(assert " ++ assertToZ3 a ++ ")(check-sat)"
 
 assertToZ3 :: Assertion -> String
 assertToZ3 (ACmp comparison) = comparisonToZ3 comparison
@@ -274,7 +278,7 @@ arithToZ3 (Sub a1 a2) = "(- " ++ arithToZ3 a1 ++ " " ++ arithToZ3 a2 ++ ")"
 arithToZ3 (Mul a1 a2) = "(* " ++ arithToZ3 a1 ++ " " ++ arithToZ3 a2 ++ ")"
 arithToZ3 (Div a1 a2) = "(/ " ++ arithToZ3 a1 ++ " " ++ arithToZ3 a2 ++ ")"
 arithToZ3 (Mod a1 a2) = "(mod " ++ arithToZ3 a1 ++ " " ++ arithToZ3 a2 ++ ")"
-arithToZ3 (Paren a) = arithToZ3 a
+arithToZ3 (Parens a) = arithToZ3 a
 
 getVar :: Assertion -> Map Name VarT
 getVar (ACmp c) = getVarCmp c
@@ -318,4 +322,4 @@ varToZ3String :: Name -> VarT -> String
 varToZ3String k v = "(declare-const " ++ k ++ " " ++ (varTasString v) ++ ")"
 
 varMapToZ3String :: Map Name VarT -> String
-varMapToZ3String m = (Map.fold (++) "" (Map.mapWithKey varToZ3String m))
+varMapToZ3String m = (Map.foldr (++) "" (Map.mapWithKey varToZ3String m))
