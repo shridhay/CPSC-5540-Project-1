@@ -3,7 +3,10 @@ module Verifier.GC (GuardedCommand(..), compileGC) where
 import Language
 import Data.SBV
 import Data.SBV.Control
-import Z3.Monad
+import Data.Map (Map)
+import qualified Data.Map as Map
+
+data VarT = IntT | ArrT
 
 data GuardedCommand = Assume Assertion
               | Assert Assertion
@@ -12,7 +15,6 @@ data GuardedCommand = Assume Assertion
               | Compose GuardedCommand GuardedCommand
               deriving (Show)
 
--- does nothing
 assumeTrue :: GuardedCommand
 assumeTrue = Assume (ACmp (Eq (Num 0) (Num 0)))
 
@@ -55,13 +57,15 @@ compileCommand (Assign x e) = do
 
 compileCommand (Write a i v) = do
     tmpA <- freshVar "arr"
-    return (Compose (Assume (AForall ["idx"] (ACmp (Eq (Read tmpA (Var "idx")) (Read a (Var "idx"))))))
+    tmpB <- freshVar "idx"
+    tmpC <- freshVar "idx"
+    return (Compose (Assume (AForall [tmpB] (ACmp (Eq (Read tmpA (Var tmpB)) (Read a (Var tmpB))))))
         (Compose (Havoc a)
             (Assume (AConj 
-                (AForall ["idx"] 
-                    (AImpl (ACmp (Neq (Var "idx") i)) 
-                        (ACmp (Eq (Read a (Var "idx")) (Read tmpA (Var "idx"))))))
-                (ACmp (Eq (Read a i) (subsArr v a tmpA)))))))
+                (AForall [tmpC] 
+                    (AImpl (ACmp (Neq (Var tmpC) i)) 
+                        (ACmp (Eq (Read a (Var tmpC)) (Read tmpA (Var tmpC))))))
+                (ACmp (Eq (Read a i)  (subsArr v a tmpA)))))))
 
 compileCommand (If b c1 c2) = do
     c1GC <- (compileBlock c1)
@@ -181,3 +185,121 @@ freshVar prefix = do
   n <- get
   put (n + 1)
   return (prefix ++ "--temp--" ++ show n)
+
+wpSubsAssert :: Assertion -> Name -> Name -> Assertion
+wpSubsAssert (ACmp comparison) x xa = ACmp (wpSubsComp comparison x xa)
+wpSubsAssert (ANot a) x xa = ANot (wpSubsAssert a x xa)
+wpSubsAssert (ADisj a1 a2) x xa = ADisj (wpSubsAssert a1 x xa) (wpSubsAssert a2 x xa)
+wpSubsAssert (AConj a1 a2) x xa = AConj (wpSubsAssert a1 x xa) (wpSubsAssert a2 x xa)
+wpSubsAssert (AImpl a1 a2) x xa = AImpl (wpSubsAssert a1 x xa) (wpSubsAssert a2 x xa)
+wpSubsAssert (AForall n a) x xa = AForall (wpSubsNameList n x xa) (wpSubsAssert a x xa)
+wpSubsAssert (AExists n a) x xa = AExists (wpSubsNameList n x xa) (wpSubsAssert a x xa)
+wpSubsAssert (AParens p) x xa = AParens (wpSubsAssert p x xa)
+
+wpSubsComp :: Comparison -> Name -> Name -> Comparison
+wpSubsComp (Eq a1 a2) x xa = Eq (wpSubsArith a1 x xa) (wpSubsArith a2 x xa)
+wpSubsComp (Neq a1 a2) x xa = Neq (wpSubsArith a1 x xa) (wpSubsArith a2 x xa)
+wpSubsComp (Le a1 a2) x xa = Le (wpSubsArith a1 x xa) (wpSubsArith a2 x xa)
+wpSubsComp (Ge a1 a2) x xa = Ge (wpSubsArith a1 x xa) (wpSubsArith a2 x xa)
+wpSubsComp (Lt a1 a2) x xa = Lt (wpSubsArith a1 x xa) (wpSubsArith a2 x xa)
+wpSubsComp (Gt a1 a2) x xa = Gt (wpSubsArith a1 x xa) (wpSubsArith a2 x xa)
+
+wpSubsArith :: ArithExp -> Name -> Name -> ArithExp
+wpSubsArith (Num n) _ _ = (Num n)
+wpSubsArith (Var varName) x xa = if (varName == x) then (Var tmp) else (Var varName)
+wpSubsArith (Add l r) x xa = Add (wpSubsArith l x xa) (wpSubsArith r x xa)
+wpSubsArith (Sub l r) x xa = Sub (wpSubsArith l x xa) (wpSubsArith r x xa)
+wpSubsArith (Mul l r) x xa = Mul (wpSubsArith l x xa) (wpSubsArith r x xa)
+wpSubsArith (Div l r) x xa = Div (wpSubsArith l x xa) (wpSubsArith r x xa)
+wpSubsArith (Mod l r) x xa = Mod (wpSubsArith l x xa) (wpSubsArith r x xa)
+wpSubsArith (Parens p) x xa = Parens (wpSubsArith p x xa)
+wpSubsArith (Read arrName idx) x xa = 
+    if (arrName == x) then (Read xa (wpSubsArith idx x xa)) else (Read arrName (wpSubsArith idx x xa))
+
+wpSubsNameList :: [Name] -> Name -> Name -> [Name]
+wpSubsNameList [] _ _ = []
+wpSubsNameList [c1] x xa = if (c1 == x) then [xa] else [c1]
+wpSubsNameList (c:cs) x xa = if (c == x) then (c : (wpSubsNameList cs x xa)) else (c : (wpSubsNameList cs x xa))
+
+wpM :: GaurdedCommand -> Assertion -> State Int Assertion
+wpM (Assume assertion) b = return (AImpl assertion b)
+wpM (Assert assertion) b = return (AConj assertion b)
+wpM (Havoc x) b = do 
+    xa <- freshVar
+    return (wpSubsAssert b x xa)
+wpM (Compose c1 c2) b = do 
+    r2 <- (wpM c2 b)
+    r1 <- (wpM c1 r2)
+    return r1
+wpM (NonDet c1 c2) b = do
+    r1 <- (wpM c1 b)
+    r2 <- (wpM c2 b)
+    return (AConj r1 r2)
+
+wp :: GuardedCommand -> Assertion -> Assertion
+wp gc a = evalState (wpM gc a) 0
+
+getVar :: Assertion -> Map Name VarT
+getVar (ACmp c) = getVarCmp c
+getVar (ANot a) = getVar a
+getVar (ADisj a1 a2) = Map.union (getVar a1) (getVar a2)
+getVar (AConj a1 a2) = Map.union (getVar a1) (getVar a2)
+getVar (AImpl a1 a2) = Map.union (getVar a1) (getVar a2)
+getVar (AForall n a) = Map.union (getVarNameList n) (getVar a) 
+getVar (AExists n a) = Map.union (getVarNameList n) (getVar a)
+getVar (AParens a) = getVar a
+
+getVarCmp :: Comparison -> Map Name VarT
+getVarCmp (Eq a1 a2) = Map.union (getVarArith a1) (getVarArith a2)
+getVarCmp (Neq a1 a2) = Map.union (getVarArith a1) (getVarArith a2)
+getVarCmp (Le a1 a2) = Map.union (getVarArith a1) (getVarArith a2)
+getVarCmp (Ge a1 a2) = Map.union (getVarArith a1) (getVarArith a2)
+getVarCmp (Lt a1 a2) = Map.union (getVarArith a1) (getVarArith a2)
+getVarCmp (Gt a1 a2) = Map.union (getVarArith a1) (getVarArith a2)
+
+getVarArith :: ArithExp -> Map Name VarT
+getVarArith (Num _) = Map.empty 
+getVarArith (Var n) = Map.singleton n IntT
+getVarArith (Read n a) = Map.union (Map.singleton n ArrT) (getVarArith a)
+getVarArith (Add a1 a2) = Map.union (getVarArith a1) (getVarArith a2)
+getVarArith (Sub a1 a2) = Map.union (getVarArith a1) (getVarArith a2)
+getVarArith (Mul a1 a2) = Map.union (getVarArith a1) (getVarArith a2)
+getVarArith (Div a1 a2) = Map.union (getVarArith a1) (getVarArith a2)
+getVarArith (Mod a1 a2) = Map.union (getVarArith a1) (getVarArith a2)
+getVarArith (Parens a) = getVarArith a
+
+getVarNameList :: [Name] -> Map Name VarT
+getVarNameList [] = Map.empty
+getVarNameList [n] = Map.singleton n IntT
+getVarNameList (n:ns) = Map.union (Map.singleton n IntT) (getVarNameList ns) 
+
+varTasString :: VarT -> String
+varTasString IntT = "Int"
+varTasString ArrT = "(Array Int Int)"
+
+
+
+
+
+
+-- makeZ3Command :: Assertion -> String
+-- makeZ3Command (ACmp comparison) = ACmp (makeZ3Command comparison) 
+-- makeZ3Command (ANot a) = ANot (wpSubsAssert a x xa)
+-- makeZ3Command (ADisj a1 a2) = ADisj (wpSubsAssert a1 x xa) (wpSubsAssert a2 x xa)
+-- makeZ3Command (AConj a1 a2) = AConj (wpSubsAssert a1 x xa) (wpSubsAssert a2 x xa)
+-- makeZ3Command (AImpl a1 a2) = AImpl (wpSubsAssert a1 x xa) (wpSubsAssert a2 x xa)
+-- makeZ3Command (AForall n a) = AForall (wpSubsNameList n x xa) (wpSubsAssert a x xa)
+-- makeZ3Command (AExists n a) = AExists (wpSubsNameList n x xa) (wpSubsAssert a x xa)
+-- makeZ3Command (AParens p) = AParens (wpSubsAssert p x xa)
+
+-- wp (Assert Assertion) = Assertion
+-- wp (Havoc Name) = 
+-- wp (Compose GuardedCommand GuardedCommand) = AConj 
+
+-- wp_assert :: GuardedCommand -> Assertion
+
+-- wp_havoc :: GuardedCommand -> State -> Assertion
+
+-- wp_compose :: GuardedCommand -> Assertion
+
+-- wp_non_det :: GuardedCommand -> Assertion
