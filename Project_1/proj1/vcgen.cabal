@@ -38,9 +38,12 @@ library
   build-depends:
       array
     , base >=4.7 && <5
+    , bytestring
     , containers
     , directory
     , mtl
+    , smtlib-backends
+    , smtlib-backends-z3
   default-language: Haskell2010
 
 executable vcgen-exe
@@ -56,9 +59,12 @@ executable vcgen-exe
   build-depends:
       array
     , base >=4.7 && <5
+    , bytestring
     , containers
     , directory
     , mtl
+    , smtlib-backends
+    , smtlib-backends-z3
     , vcgen
   default-language: Haskell2010
 

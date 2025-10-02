@@ -42,6 +42,9 @@ library:
   build-depends:
     - mtl
     - containers
+    - bytestring
+    - smtlib-backends
+    - smtlib-backends-z3
 
 executables:
   vcgen-exe:
@@ -55,6 +58,9 @@ executables:
       - vcgen
       - mtl
       - containers
+      - bytestring
+      - smtlib-backends
+      - smtlib-backends-z3
 
 tests:
   vcgen-test:
