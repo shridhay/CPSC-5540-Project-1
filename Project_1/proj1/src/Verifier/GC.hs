@@ -244,7 +244,7 @@ wp :: GuardedCommand -> Assertion
 wp gc = evalState (wpM gc (ACmp (Eq (Num 0) (Num 0)))) 0
 
 wpToZ3 :: Assertion -> String
-wpToZ3 a = varMapToZ3String (getVar a) ++ "(assert " ++ assertToZ3 a ++ ")(check-sat)"
+wpToZ3 a = varMapToZ3String (getVar a) ++ "(assert (not " ++ assertToZ3 a ++ "))(check-sat)"
 
 assertToZ3 :: Assertion -> String
 assertToZ3 (ACmp comparison) = comparisonToZ3 comparison
