@@ -280,6 +280,9 @@ varTasString ArrT = "(Array Int Int)"
 varToZ3String :: Name -> VarT -> String
 varToZ3String k v = "(declare-const " ++ k ++ " " ++ (varTasString v) ++ ")"
 
+varMapToZ3String :: Map Name VarT -> String
+varMapToZ3String m = (Map.fold (++) "" (Map.mapWithKey varToZ3String m))
+
 
 
 -- makeZ3Command :: Assertion -> String
