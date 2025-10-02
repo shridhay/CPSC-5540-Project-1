@@ -277,8 +277,8 @@ varTasString :: VarT -> String
 varTasString IntT = "Int"
 varTasString ArrT = "(Array Int Int)"
 
-
-
+varToZ3String :: Name -> VarT -> String
+varToZ3String k v = "(declare-const " ++ k ++ " " ++ (varTasString v) ++ ")"
 
 
 
