@@ -1,3 +1,16 @@
+This Implementation was developed by Jonathan Chen and Hridhay Suresh.
+
+To run this implementation you must have haskell, the Z3 library, and Containers installed.
+
+We imported various libraries into their specific files.  
+
+Once the Z3 library is installed you will need to include Z3 as a library in your extra-include-dirs and your extra-lib-dirs libraries.
+
+
+
+
+
+
 # Getting Started
 
 Begin by [installing Stack](https://docs.haskellstack.org/en/stable/install_and_upgrade) on your local machine.
@@ -28,3 +41,4 @@ This directory provides a basic test suite that collects programs from the `benc
 # Continuous Integration
 
 This repository provides a GitHub workflow that is triggered on every push to the `main` branch on the GitHub remote. The workflow checks out the latest commit on the `main` branch and run `stack test`. It also provides access to Z3, a SMT solver, on your `PATH` with the name `z3`. Feel free to set up a different SMT solver if that is what you choose to use.
+
