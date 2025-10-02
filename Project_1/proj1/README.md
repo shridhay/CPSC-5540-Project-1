@@ -6,9 +6,9 @@ We imported various libraries into their specific files.
 
 Once the Z3 library is installed you will need to include Z3 as a library in your extra-include-dirs and your extra-lib-dirs libraries.
 
+Once the above task is completed, you will then need to run the "stack build" command.
 
-
-
+Following the stack build command, you will need to then run the command "stack run /path/to/program.imp" with "/path/to/program.imp" being the file path to the .imp benchmark file that you would like to run.
 
 
 # Getting Started
