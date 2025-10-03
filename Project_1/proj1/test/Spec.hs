@@ -1,4 +1,4 @@
-import Verify
+import Verifier.Verify
 
 import Data.List (findIndices)
 import Data.Maybe (fromMaybe)
