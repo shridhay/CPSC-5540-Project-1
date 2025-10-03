@@ -1,8 +1,6 @@
 module Verifier.GC (GuardedCommand(..), getZ3String) where
 
 import Language
--- import Data.SBV
--- import Data.SBV.Control
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Control.Monad.State.Lazy

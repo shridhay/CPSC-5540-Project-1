@@ -10,7 +10,6 @@ Once the above task is completed, you will then need to run the "stack build" co
 
 Following the stack build command, you will need to then run the command "stack run /path/to/program.imp" with "/path/to/program.imp" being the file path to the .imp benchmark file that you would like to run.
 
-
 # Getting Started
 
 Begin by [installing Stack](https://docs.haskellstack.org/en/stable/install_and_upgrade) on your local machine.
