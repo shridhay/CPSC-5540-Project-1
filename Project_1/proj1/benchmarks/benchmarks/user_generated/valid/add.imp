@@ -1,7 +1,0 @@
-program add 
-  pre n >= 0 && m >= 0 
-  post p = n + m is
-  p := 0;
-  x := n;
-  p := x + m;
-end
