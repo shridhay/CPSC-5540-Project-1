@@ -17,7 +17,7 @@ packages:
       sha256: 0500c8d268412dbd6c24a0dd2772a3cda8b3efe315f53bbf23b310c03298d392
       size: 500
   original:
-    hackage: smtlib-backends-z3-0.3.1
+    hackage: smtlib-backends-z3-0.3.1@sha256:204c05d11c505fe0eceacdd8716888d78d39b3f4eb49ca49bb9c88928fcc61c0,1964
 snapshots:
 - completed:
     sha256: c11fcbeb1aa12761044755b1109d16952ede2cb6147ebde777dd5cb38f784501

@@ -1,11 +1,13 @@
-program arithmeticsum pre n >= 0 post p = ((n * n) + n) / 2 is
+program arithmeticsum 
+  pre n >= 0  
+  post p = (((n * n) + n) / 2) is
   p := 0;
   x := 0;
-while x < n
-  inv p = ((n * n) + n) / 2
-  inv x <= n + 1
-do
-  x := x + 1;
-  p := p + x;
-end
+  while x < n
+    inv p = (((x * x) + x) / 2)
+    inv x <= n 
+  do
+    x := x + 1;
+    p := p + x;
+  end
 end

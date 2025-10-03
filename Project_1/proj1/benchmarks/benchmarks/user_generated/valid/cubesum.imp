@@ -1,11 +1,14 @@
-program arithmeticsum pre n >= 0 post p = (((n * n) * ((n * n) + (2 * n) + 1)) / 4) is
+program cubesum 
+  pre n >= 0 
+  post p = ((((n * n) + n) * ((n * n) + n)) / 4)
+  is
   p := 0;
   x := 0;
-while x < n
-  inv p = ((n * n) * ((n * n) + (2 * n) + 1)) / 4
-  inv x <= n + 1
-do
-  x := x + 1;
-  p := p + ;
-end
+  while x < n
+    inv p = ((((x * x) + x) * ((x * x) + x)) / 4)
+    inv x <= n 
+  do
+    x := x + 1;
+    p := p + (x * x * x);
+  end
 end

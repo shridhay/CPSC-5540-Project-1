@@ -1,11 +1,7 @@
-program add pre n >= 0 post p = n * m is
+program add 
+  pre n >= 0 && m >= 0 
+  post p = n + m is
   p := 0;
-  x := 0;
-while x < n
-  inv p = x + m
-  inv x <= n
-do
-  x := x + 1;
-  p := p + 1;
-end
+  x := n;
+  p := x + m;
 end

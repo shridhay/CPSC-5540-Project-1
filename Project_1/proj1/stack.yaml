@@ -44,7 +44,7 @@ packages:
 # extra-deps: []
 extra-deps:
   - smtlib-backends-0.4
-  - smtlib-backends-z3-0.3.1
+  - smtlib-backends-z3-0.3.1@sha256:204c05d11c505fe0eceacdd8716888d78d39b3f4eb49ca49bb9c88928fcc61c0,1964
 # Override default flag values for local packages and extra-deps
 # flags: {}
 
