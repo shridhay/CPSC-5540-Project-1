@@ -4,7 +4,7 @@ To run this implementation you must have haskell, the Z3 library, and Containers
 
 We imported various libraries into their specific files.  
 
-Once the Z3 library is installed you will need to include Z3 as a library in your extra-include-dirs and your extra-lib-dirs libraries.
+Once the Z3 library is installed you will need to include Z3 as a library in your extra-include-dirs and your extra-lib-dirs libraries.  Since we are utilizing Z3 
 
 Once the above task is completed, you will then need to run the "stack build" command.
 
